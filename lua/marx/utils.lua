@@ -1,77 +1,88 @@
 local M = {}
 
-local next_mark_id = 0
+local highlight = require "marx.highlight"
 
 M.group = "MarxGroup"
+M.ns_id = vim.api.nvim_create_namespace(M.group)
+M.next_mark_id = 1
 
----@class marx.AddSignOpts
+---@class marx.RemoveMarkOpts
+---@field id number? -- if nil, the mark at the given row will be removed
 ---@field bufnr number
----@field lnum number
----@field text string
----@field priority number?
+---@field row number?
 
----@param opts marx.AddSignOpts
----@return number: sign id of the added sign
-M.add_sign = function(opts)
-  opts.priority = opts.priority or 10
-  local placed_id = M.get_sign_id(opts.bufnr, opts.lnum)
-  if placed_id then
-    return placed_id
-  end
-  return M._add_sign(opts)
-end
-
----@param opts marx.AddSignOpts
----@return number: sign id of the added sign
-M._add_sign = function(opts)
-  next_mark_id = next_mark_id + 1
-  local sign_id = next_mark_id
-  local sign_name = "Marx_" .. sign_id
-  vim.fn.sign_define(sign_name, {
-    text = opts.text,
-    texthl = "MarxSignHL",
-    numhl = "MarxSignNumHL",
-  })
-  vim.fn.sign_place(sign_id, M.group, sign_name, opts.bufnr, {
-    lnum = opts.lnum,
-    priority = opts.priority,
-  })
-  return sign_id
-end
-
----@class marx.RemoveSignOpts
----@field bufnr number
----@field lnum number
-
----@param opts marx.RemoveSignOpts
-M.remove_sign = function(opts)
-  local placed = vim.fn.sign_getplaced(opts.bufnr, { group = M.group })
-  local signs = placed[1] and placed[1].signs or {}
-  local to_remove = nil
-  for _, sign in ipairs(signs) do
-    if sign.lnum == opts.lnum then
-      to_remove = sign.id
-    end
-  end
-  if to_remove == nil then
+---@param opts marx.RemoveMarkOpts
+function M.remove_mark(opts)
+  if opts.id then
+    vim.api.nvim_buf_del_extmark(opts.bufnr, M.ns_id, opts.id)
     return
   end
-  vim.fn.sign_unplace(M.group, { id = to_remove, buffer = opts.bufnr })
+
+  local to_remove_id = M.get_mark_id(opts.bufnr, opts.row)
+  if not to_remove_id then
+    return
+  end
+  vim.api.nvim_buf_del_extmark(opts.bufnr, M.ns_id, to_remove_id)
 end
 
----get sign id placed on a line
----@param bufnr number
----@param lnum number
----@return number?: the id of the sign placed on the line or nil if no sign is placed
-M.get_sign_id = function(bufnr, lnum)
-  local placed = vim.fn.sign_getplaced(bufnr, { group = M.group })
-  local signs = placed[1] and placed[1].signs or {}
-  for _, sign in ipairs(signs) do
-    if sign.lnum == lnum then
-      return sign.id
-    end
+function M.get_mark_id(bufnr, row)
+  local extmarks = vim.api.nvim_buf_get_extmarks(bufnr, M.ns_id, { row, 0 }, { row + 1, 0 }, { limit = 1 })
+  if #extmarks == 0 then
+    return nil
   end
-  return nil
+  return extmarks[1][1]
+end
+
+function M.get_mark(bufnr, row)
+  local extmarks = vim.api.nvim_buf_get_extmarks(
+    bufnr,
+    M.ns_id,
+    { row, 0 },
+    { row + 1, 0 },
+    { limit = 1, details = true }
+  )
+  if #extmarks == 0 then
+    return nil
+  end
+  return extmarks[1]
+end
+
+function M.get_mark_by_id(bufnr, id)
+  local mark = vim.api.nvim_buf_get_extmark_by_id(bufnr, M.ns_id, id, { details = true })
+  return mark
+end
+
+---@class marx.SetMarkOpts
+---@field id number? -- if nil, a new mark will be created
+---@field priority number?
+---@field text string|table
+---@field bufnr number
+---@field row number
+
+---@param opts marx.SetMarkOpts
+function M.set_mark(opts)
+  local text = opts.text
+  if type(text) == "string" then
+    text = { { text, highlight.virt_text_hl } }
+  elseif not text then
+    text = {} -- empty if nil
+  end
+  local id
+  if opts.id then
+    id = opts.id
+  else
+    id = M.next_mark_id
+    M.next_mark_id = M.next_mark_id + 1
+  end
+  vim.api.nvim_buf_set_extmark(opts.bufnr, M.ns_id, opts.row, 0, {
+    id = id,
+    virt_text = text,
+    virt_text_pos = "eol",
+    hl_mode = "combine",
+    priority = opts.priority or 10,
+    sign_text = "",
+    sign_hl_group = highlight.sign_hl,
+  })
 end
 
 return M

@@ -1,49 +1,50 @@
 local M = {}
 
 local utils = require "marx.utils"
+local highlight = require "marx.highlight"
 
-M.setup = function()
+function M.setup()
+  highlight.setup()
   vim.keymap.set("n", "<leader>bm", function()
-    M.toggle_bookmark()
+    M.set_bookmark()
   end)
 end
 
-M.add_bookmark = function()
-  local line_num = vim.fn.line "."
-  local bufnr = vim.fn.bufnr "%"
-  utils.add_sign {
-    bufnr = bufnr,
-    lnum = line_num,
-    text = "",
-    priority = 10,
-  }
-end
+function M.set_bookmark()
+  local row = vim.fn.line "." - 1
+  local bufnr = vim.api.nvim_get_current_buf()
 
-M.remove_bookmark = function()
-  local line_num = vim.fn.line "."
-  local bufnr = vim.fn.bufnr "%"
-  utils.remove_sign {
-    bufnr = bufnr,
-    lnum = line_num,
-  }
-end
+  local old_mark = utils.get_mark(bufnr, row)
+  local old_text = old_mark and old_mark[4].virt_text[1][1] or nil
 
-M.toggle_bookmark = function()
-  local line_num = vim.fn.line "."
-  local bufnr = vim.fn.bufnr "%"
-  if utils.get_sign_id(bufnr, line_num) then
-    utils.remove_sign {
-      bufnr = bufnr,
-      lnum = line_num,
-    }
-  else
-    utils.add_sign {
-      bufnr = bufnr,
-      lnum = line_num,
-      text = "",
-      priority = 10,
-    }
-  end
+  vim.ui.input({ prompt = "Bookmark text: ", default = old_text }, function(input)
+    local text = input and input or old_text
+    if text == "" then
+      if old_mark then
+        utils.remove_mark { id = old_mark[1], bufnr = bufnr }
+      else
+        utils.remove_mark {
+          bufnr = bufnr,
+          row = row,
+        }
+      end
+    else
+      if old_mark then
+        utils.set_mark {
+          id = old_mark[1],
+          text = text,
+          bufnr = bufnr,
+          row = row,
+        }
+      else
+        utils.set_mark {
+          text = text,
+          bufnr = bufnr,
+          row = row,
+        }
+      end
+    end
+  end)
 end
 
 return M
