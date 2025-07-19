@@ -11,7 +11,7 @@ function M.setup()
 end
 
 function M.set_bookmark()
-  local row = vim.fn.line "." - 1
+  local row = vim.api.nvim_win_get_cursor(0)[1] - 1
   local bufnr = vim.api.nvim_get_current_buf()
 
   local old_mark = utils.get_mark(bufnr, row)
