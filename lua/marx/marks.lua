@@ -72,8 +72,9 @@ function M.set_mark(opts)
   vim.api.nvim_buf_set_extmark(opts.bufnr, M.ns_id, opts.row, 0, {
     id = opts.id,
     hl_group = highlight.code_hl,
-    end_row = opts.row,
-    end_col = line_length,
+    -- BUG: this will sometimes be out of range for no reason
+    -- end_row = opts.row,
+    -- end_col = line_length,
     virt_text = text,
     virt_text_pos = "eol",
     priority = opts.priority or 10,
