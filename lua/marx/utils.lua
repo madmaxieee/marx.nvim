@@ -53,7 +53,7 @@ function M.get_mark_by_id(bufnr, id)
 end
 
 ---@class marx.SetMarkOpts
----@field id number? -- if nil, a new mark will be created
+---@field id number?
 ---@field priority number?
 ---@field text string|table
 ---@field bufnr number
@@ -67,6 +67,7 @@ function M.set_mark(opts)
   elseif not text then
     text = {} -- empty if nil
   end
+
   local id
   if opts.id then
     id = opts.id
@@ -74,11 +75,16 @@ function M.set_mark(opts)
     id = M.next_mark_id
     M.next_mark_id = M.next_mark_id + 1
   end
+
+  local line_length = #(vim.api.nvim_buf_get_lines(0, opts.row, opts.row + 1, false)[1] or "")
+
   vim.api.nvim_buf_set_extmark(opts.bufnr, M.ns_id, opts.row, 0, {
     id = id,
+    hl_group = highlight.code_hl,
+    end_row = opts.row,
+    end_col = line_length,
     virt_text = text,
     virt_text_pos = "eol",
-    hl_mode = "combine",
     priority = opts.priority or 10,
     sign_text = "",
     sign_hl_group = highlight.sign_hl,
