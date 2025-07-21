@@ -63,24 +63,33 @@ function M.set_mark(opts)
   local text = opts.text
   if type(text) == "string" then
     text = { { text, highlight.virt_text_hl } }
-  elseif not text then
-    text = {} -- empty if nil
   end
 
-  local line_length = #(vim.api.nvim_buf_get_lines(0, opts.row, opts.row + 1, false)[1] or "")
+  local function set_mark()
+    local line = vim.api.nvim_buf_get_lines(opts.bufnr, opts.row, opts.row + 1, false)[1] or ""
+    local line_length = #line
+    vim.api.nvim_buf_set_extmark(opts.bufnr, M.ns_id, opts.row, 0, {
+      id = opts.id,
+      hl_group = highlight.code_hl,
+      end_row = opts.row,
+      end_col = line_length,
+      virt_text = text,
+      virt_text_pos = "eol",
+      priority = opts.priority or 10,
+      sign_text = "",
+      sign_hl_group = highlight.sign_hl,
+    })
+  end
 
-  vim.api.nvim_buf_set_extmark(opts.bufnr, M.ns_id, opts.row, 0, {
-    id = opts.id,
-    hl_group = highlight.code_hl,
-    -- BUG: this will sometimes be out of range for no reason
-    -- end_row = opts.row,
-    -- end_col = line_length,
-    virt_text = text,
-    virt_text_pos = "eol",
-    priority = opts.priority or 10,
-    sign_text = "",
-    sign_hl_group = highlight.sign_hl,
-  })
+  if vim.api.nvim_buf_is_loaded(opts.bufnr) then
+    set_mark()
+  else
+    vim.api.nvim_create_autocmd("BufRead", {
+      pattern = ("<buffer=%d>"):format(opts.bufnr),
+      once = true,
+      callback = set_mark,
+    })
+  end
 end
 
 return M

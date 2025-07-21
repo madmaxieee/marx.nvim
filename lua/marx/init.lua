@@ -16,14 +16,6 @@ function M.setup()
       row = mark.row,
     }
   end
-
-  vim.keymap.set("n", "<leader>bm", M.set_bookmark)
-  vim.keymap.set("n", "]M", function()
-    M.next_mark { wrap = true }
-  end)
-  vim.keymap.set("n", "[M", function()
-    M.prev_mark { wrap = true }
-  end)
 end
 
 function M.set_bookmark()
