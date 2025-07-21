@@ -129,4 +129,12 @@ function M.prev_mark(opts)
   end
 end
 
+function M.pick_mark()
+  local marx_telescope = require "marx.telescope"
+  local actions = require "telescope.actions"
+  return marx_telescope.pick_mark(function(mark)
+    actions.jump(mark.id)
+  end)
+end
+
 return M
