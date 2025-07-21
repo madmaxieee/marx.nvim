@@ -33,7 +33,7 @@ function M.set_bookmark()
         marx.remove_mark { id = old_mark[1], bufnr = bufnr }
         database.remove_mark(old_mark[1])
       end
-    else
+    elseif text ~= nil then
       if old_mark then
         database.upsert_mark {
           id = old_mark[1],
@@ -131,7 +131,7 @@ end
 
 function M.pick_mark()
   local marx_telescope = require "marx.telescope"
-  local actions = require "telescope.actions"
+  local actions = require "marx.actions"
   return marx_telescope.pick_mark(function(mark)
     actions.jump(mark.id)
   end)

@@ -1,6 +1,7 @@
 local M = {}
 
 local database = require "marx.database"
+local utils = require "marx.utils"
 
 local has_telescope, _ = pcall(require, "telescope")
 if not has_telescope then
@@ -12,6 +13,8 @@ local finders = require "telescope.finders"
 local actions = require "telescope.actions"
 local conf = require("telescope.config").values
 local action_state = require "telescope.actions.state"
+
+local marx_actions = require "marx.actions"
 
 ---@class FormatEntryConstraints
 ---@field max_title number?
@@ -68,55 +71,91 @@ function M.pick_mark(callback, opts)
     opts.marks = marks_list
   end
 
-  ---@type FormatEntryConstraints
-  local constraints = {
-    max_title = 0,
-    max_filename = 0,
-    max_filepath = 0,
-  }
+  ---@param marks marx.MarkData[]
+  local function open_picker(marks)
+    marks = utils.filter_list(marks, function(mark)
+      if type(mark) ~= "table" then
+        return false
+      end
+      if not mark.id or not mark.file or not mark.row or not mark.title then
+        return false
+      end
+      if not database.marks[mark.id] then
+        return false
+      end
+      return true
+    end)
 
-  for _, m in ipairs(opts.marks) do
-    constraints.max_title = math.max(constraints.max_title, #m.title)
-    local filename = vim.fn.fnamemodify(m.file, ":t")
-    local path = vim.fn.pathshorten(m.file)
-    constraints.max_filename = math.max(constraints.max_filename, #filename)
-    constraints.max_filepath = math.max(constraints.max_filepath, #path)
+    ---@type FormatEntryConstraints
+    local constraints = {
+      max_title = 0,
+      max_filename = 0,
+      max_filepath = 0,
+    }
+
+    for _, m in ipairs(marks) do
+      constraints.max_title = math.max(constraints.max_title, #m.title)
+      local filename = vim.fn.fnamemodify(m.file, ":t")
+      local path = vim.fn.pathshorten(m.file)
+      constraints.max_filename = math.max(constraints.max_filename, #filename)
+      constraints.max_filepath = math.max(constraints.max_filepath, #path)
+    end
+
+    pickers
+      .new({}, {
+        prompt_title = "Pick Our Bookmarks",
+        finder = finders.new_table {
+          results = marks,
+          ---@param bookmark marx.MarkData
+          entry_maker = function(bookmark)
+            local display = format_entry(bookmark, constraints)
+            return {
+              value = bookmark,
+              display = display,
+              ordinal = display,
+              filename = bookmark.file,
+              col = 0,
+              lnum = bookmark.row + 1,
+            }
+          end,
+        },
+        sorter = conf.generic_sorter(opts),
+        previewer = conf.grep_previewer(opts),
+        attach_mappings = function(prompt_bufnr, map)
+          actions.select_default:replace(function()
+            actions.close(prompt_bufnr)
+            local selected = action_state.get_selected_entry()
+            if selected == nil then
+              return
+            end
+            callback(selected.value)
+          end)
+
+          map("i", "<C-d>", function()
+            local selected = action_state.get_selected_entry()
+            if selected == nil then
+              return
+            end
+            marx_actions.remove(selected.value.id)
+            open_picker(marks)
+          end)
+
+          map("n", "x", function()
+            local selected = action_state.get_selected_entry()
+            if selected == nil then
+              return
+            end
+            marx_actions.remove(selected.value.id)
+            open_picker(marks)
+          end)
+
+          return true
+        end,
+      })
+      :find()
   end
 
-  pickers
-    .new({}, {
-      prompt_title = "Pick Our Bookmarks",
-      finder = finders.new_table {
-        results = opts.marks,
-        ---@param bookmark marx.MarkData
-        entry_maker = function(bookmark)
-          local display = format_entry(bookmark, constraints)
-          return {
-            value = bookmark,
-            display = display,
-            ordinal = display,
-            filename = bookmark.file,
-            col = 0,
-            lnum = bookmark.row + 1,
-          }
-        end,
-      },
-      sorter = conf.generic_sorter(opts),
-      previewer = conf.grep_previewer(opts),
-      attach_mappings = function(prompt_bufnr, map)
-        actions.select_default:replace(function()
-          actions.close(prompt_bufnr)
-          local selected = action_state.get_selected_entry()
-          if selected == nil then
-            return
-          end
-          callback(selected.value)
-        end)
-
-        return true
-      end,
-    })
-    :find()
+  open_picker(opts.marks)
 end
 
 return M
