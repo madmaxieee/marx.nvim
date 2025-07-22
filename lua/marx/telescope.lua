@@ -103,7 +103,7 @@ function M.pick_mark(callback, opts)
 
     pickers
       .new({}, {
-        prompt_title = "Pick Our Bookmarks",
+        prompt_title = "Our Bookmarx",
         finder = finders.new_table {
           results = marks,
           ---@param bookmark marx.MarkData
