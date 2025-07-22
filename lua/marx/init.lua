@@ -12,7 +12,7 @@ function M.setup()
     marx.set_extmark {
       id = mark.id,
       text = mark.title,
-      bufnr = vim.uri_to_bufnr(vim.uri_from_fname(mark.file)),
+      bufnr = vim.uri_to_bufnr(vim.uri_from_fname(mark.path)),
       row = mark.row,
     }
   end
@@ -39,7 +39,7 @@ function M.set_bookmark()
 
   vim.ui.input({ prompt = "Title: ", default = old_text }, function(input)
     local text = input and input or old_text
-    local code = vim.api.nvim_buf_get_lines(bufnr, row, row + 1, false)[1] or ""
+    local content = vim.api.nvim_buf_get_lines(bufnr, row, row + 1, false)[1] or ""
     if text == "" then
       if old_mark then
         marx.remove_mark { id = old_mark[1], bufnr = bufnr }
@@ -49,10 +49,10 @@ function M.set_bookmark()
       if old_mark then
         database.update_mark {
           id = old_mark[1],
-          file = vim.api.nvim_buf_get_name(bufnr),
+          path = vim.api.nvim_buf_get_name(bufnr),
           row = row,
           title = text,
-          code = code,
+          content = content,
         }
         marx.set_extmark {
           id = old_mark[1],
@@ -62,10 +62,10 @@ function M.set_bookmark()
         }
       else
         local id = database.insert_mark {
-          file = vim.api.nvim_buf_get_name(bufnr),
+          path = vim.api.nvim_buf_get_name(bufnr),
           row = row,
           title = text,
-          code = code,
+          content = content,
         }
         marx.set_extmark {
           id = id,

@@ -2,7 +2,7 @@
 
 ---@class marx.MarkData
 ---@field id number?
----@field file string
+---@field path string
 ---@field row number
 ---@field title string
----@field code string
+---@field content string

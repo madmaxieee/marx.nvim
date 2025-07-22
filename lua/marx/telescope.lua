@@ -21,13 +21,11 @@ local marx_actions = require "marx.actions"
 ---@param mark marx.MarkData
 local function make_ordinal(mark)
   local title = mark.title
-  local filename = vim.fn.fnamemodify(mark.file, ":t")
-  local path = mark.file
-
+  local filename = vim.fn.fnamemodify(mark.path, ":t")
+  local path = mark.path
   if #title < 50 then
     title = title .. string.rep(" ", 50 - #title)
   end
-
   return string.format("%s │ %s %s", title, filename, path)
 end
 
@@ -55,23 +53,17 @@ function M.pick_mark(callback, opts)
 
   ---@param entry {value:marx.MarkData}
   local make_display = function(entry)
-    local path = entry.value.file
-    local filename = vim.fn.fnamemodify(entry.value.file, ":t")
+    local path = entry.value.path
+    local filename = vim.fn.fnamemodify(entry.value.path, ":t")
     local _, hl_group, icon = transform_devicons(filename, "", false)
 
-    local cwd = vim.fn.getcwd()
-    if path:sub(1, #cwd) == cwd then
-      path = "." .. path:sub(#cwd + 1)
-    end
-    local home_dir = vim.fn.expand "~"
-    if path:sub(1, #home_dir) == home_dir then
-      path = "~" .. path:sub(#home_dir + 1)
-    end
+    path = vim.fn.fnamemodify(path, ":~:.")
+    path = vim.fn.fnamemodify(path, ":.")
 
     return displayer {
       { entry.value.title, "TelescopeResultsIdentifier" },
       { icon, hl_group },
-      vim.fn.fnamemodify(entry.value.file, ":t"),
+      filename .. ":" .. entry.value.row + 1,
       { path, "TelescopeResultsField" },
     }
   end
@@ -82,7 +74,7 @@ function M.pick_mark(callback, opts)
       if type(mark) ~= "table" then
         return false
       end
-      if not mark.id or not mark.file or not mark.row or not mark.title then
+      if not mark.id or not mark.path or not mark.row or not mark.title then
         return false
       end
       if not database.marks[mark.id] then
@@ -102,7 +94,7 @@ function M.pick_mark(callback, opts)
               value = mark,
               display = make_display,
               ordinal = make_ordinal(mark),
-              filename = mark.file,
+              filename = mark.path,
               col = 0,
               lnum = mark.row + 1,
             }

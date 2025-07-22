@@ -9,10 +9,10 @@ local tbl = require "sqlite.tbl"
 
 local marks_tbl = tbl("marks", {
   id = true,
-  file = { "text", required = true },
+  path = { "text", required = true },
   row = { "integer", required = true },
   title = { "text", required = true },
-  code = { "text", required = true },
+  content = { "text", required = true },
 })
 
 M.db = sqlite {
@@ -31,19 +31,20 @@ M.file_marks = {}
 
 ---@param opts marx.DatabaseSetupOpts
 function M.setup(opts)
+  ---@type marx.MarkData[]
   local rows = marks_tbl:get {}
   for _, row in ipairs(rows) do
     -- PERF: huge waste if we have a lot of marks, try to make string like work
-    if vim.startswith(row.file, opts.root_path) then
+    if vim.startswith(row.path, opts.root_path) then
       M.marks[row.id] = {
         id = row.id,
-        file = row.file,
+        path = row.path,
         row = row.row,
         title = row.title,
-        code = row.code,
+        content = row.content,
       }
-      M.file_marks[row.file] = M.file_marks[row.file] or {}
-      M.file_marks[row.file][row.id] = M.marks[row.id]
+      M.file_marks[row.path] = M.file_marks[row.path] or {}
+      M.file_marks[row.path][row.id] = M.marks[row.id]
     end
   end
 end
@@ -51,14 +52,14 @@ end
 ---@param mark marx.MarkData
 function M.insert_mark(mark)
   mark.id = marks_tbl:insert {
-    file = mark.file,
+    path = mark.path,
     row = mark.row,
     title = mark.title,
-    code = mark.code,
+    content = mark.content,
   }
   M.marks[mark.id] = mark
-  M.file_marks[mark.file] = M.file_marks[mark.file] or {}
-  M.file_marks[mark.file][mark.id] = mark
+  M.file_marks[mark.path] = M.file_marks[mark.path] or {}
+  M.file_marks[mark.path][mark.id] = mark
   return mark.id
 end
 
@@ -67,10 +68,10 @@ function M.update_mark(mark)
   marks_tbl:update {
     where = { id = mark.id },
     set = {
-      file = mark.file,
+      path = mark.path,
       row = mark.row,
       title = mark.title,
-      code = mark.code,
+      content = mark.content,
     },
   }
 end
@@ -78,7 +79,7 @@ end
 ---@param id number
 function M.remove_mark(id)
   marks_tbl:remove { where = { id = id } }
-  M.file_marks[M.marks[id].file][id] = nil
+  M.file_marks[M.marks[id].path][id] = nil
   M.marks[id] = nil
 end
 

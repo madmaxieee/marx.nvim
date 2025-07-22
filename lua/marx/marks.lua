@@ -54,77 +54,86 @@ end
 
 ---@class marx.SetMarkOpts
 ---@field id number
----@field text string|table
+---@field text string|any[]
 ---@field bufnr number
 ---@field row number
 
 ---@param opts marx.SetMarkOpts
 local function _set_extmark(opts)
+  local line = vim.api.nvim_buf_get_lines(opts.bufnr, opts.row, opts.row + 1, false)[1] or ""
+  local line_length = #line
   local text = opts.text
   if type(text) == "string" then
     text = { { text, highlight.virt_text_hl } }
   end
-
-  local function set_mark()
-    local line = vim.api.nvim_buf_get_lines(opts.bufnr, opts.row, opts.row + 1, false)[1] or ""
-    local line_length = #line
-    vim.api.nvim_buf_set_extmark(opts.bufnr, M.ns_id, opts.row, 0, {
-      id = opts.id,
-      hl_group = highlight.code_hl,
-      end_row = opts.row,
-      end_col = line_length,
-      virt_text = text,
-      virt_text_pos = "eol",
-      priority = 10,
-      sign_text = "",
-
-      sign_hl_group = highlight.sign_hl,
-    })
-  end
-
-  if vim.api.nvim_buf_is_loaded(opts.bufnr) then
-    set_mark()
-  else
-    vim.api.nvim_create_autocmd("BufRead", {
-      pattern = ("<buffer=%d>"):format(opts.bufnr),
-      once = true,
-      callback = set_mark,
-    })
-  end
+  vim.api.nvim_buf_set_extmark(opts.bufnr, M.ns_id, opts.row, 0, {
+    id = opts.id,
+    hl_group = highlight.background_hl,
+    end_row = opts.row,
+    end_col = line_length,
+    virt_text = text,
+    virt_text_pos = "eol",
+    priority = 10,
+    sign_text = "󰃁",
+    sign_hl_group = highlight.sign_hl,
+  })
 end
 
 ---@param opts marx.SetMarkOpts
 function M.set_extmark(opts)
-  pcall(_set_extmark, opts)
+  if vim.api.nvim_buf_is_loaded(opts.bufnr) then
+    pcall(_set_extmark, opts)
+  else
+    vim.api.nvim_create_autocmd("BufRead", {
+      pattern = ("<buffer=%d>"):format(opts.bufnr),
+      once = true,
+      callback = function()
+        pcall(_set_extmark, opts)
+      end,
+    })
+  end
 end
 
 ---@param id number
 ---@param buf_content? string[]
 function M.calibrate_mark(id, buf_content)
   local mark = database.marks[id]
-  local bufnr = vim.uri_to_bufnr(vim.uri_from_fname(mark.file))
+  local bufnr = vim.uri_to_bufnr(vim.uri_from_fname(mark.path))
   buf_content = buf_content or vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
 
   local extmark_pos = vim.api.nvim_buf_get_extmark_by_id(bufnr, M.ns_id, id, {})
   if #extmark_pos ~= 0 then
     local new_row = extmark_pos[1]
-    mark.row = new_row
-    mark.code = buf_content[new_row + 1]
-    database.update_mark(mark)
-    return
+    if new_row >= 0 and new_row < #buf_content then
+      mark.row = new_row
+      mark.content = buf_content[new_row + 1]
+      database.update_mark(mark)
+      return
+    end
   end
 
-  if buf_content[mark.row + 1] == mark.code then
+  if buf_content[mark.row + 1] == mark.content then
+    M.set_extmark {
+      id = id,
+      text = mark.title,
+      bufnr = bufnr,
+      row = mark.row,
+    }
     return
   end
 
   for i = 1, #buf_content do
-    if mark.row + 1 + i <= #buf_content and buf_content[mark.row + 1 + i] == mark.code then
-      mark.row = mark.row + i
-      break
-    end
-    if mark.row + 1 - i >= 1 and buf_content[mark.row + 1 - i] == mark.code then
-      mark.row = mark.row - i
+    if mark.row + 1 + i <= #buf_content then
+      if buf_content[mark.row + 1 + i] == mark.content then
+        mark.row = mark.row + i
+        break
+      end
+    elseif mark.row + 1 - i >= 1 then
+      if buf_content[mark.row + 1 - i] == mark.content then
+        mark.row = mark.row - i
+        break
+      end
+    else
       break
     end
   end
