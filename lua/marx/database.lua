@@ -23,6 +23,9 @@ M.db = sqlite {
 ---@type table<number, marx.MarkData>
 M.marks = {}
 
+---@type table<string, table<number, marx.MarkData>>
+M.file_marks = {}
+
 ---@class marx.DatabaseSetupOpts
 ---@field root_path string The root path for the marks, used to filter marks by file path.
 
@@ -39,37 +42,43 @@ function M.setup(opts)
         title = row.title,
         code = row.code,
       }
+      M.file_marks[row.file] = M.file_marks[row.file] or {}
+      M.file_marks[row.file][row.id] = M.marks[row.id]
     end
   end
 end
 
 ---@param mark marx.MarkData
-function M.upsert_mark(mark)
-  if not mark.id then
-    mark.id = marks_tbl:insert {
+function M.insert_mark(mark)
+  mark.id = marks_tbl:insert {
+    file = mark.file,
+    row = mark.row,
+    title = mark.title,
+    code = mark.code,
+  }
+  M.marks[mark.id] = mark
+  M.file_marks[mark.file] = M.file_marks[mark.file] or {}
+  M.file_marks[mark.file][mark.id] = mark
+  return mark.id
+end
+
+---@param mark marx.MarkData
+function M.update_mark(mark)
+  marks_tbl:update {
+    where = { id = mark.id },
+    set = {
       file = mark.file,
       row = mark.row,
       title = mark.title,
       code = mark.code,
-    }
-  else
-    marks_tbl:update {
-      where = { id = mark.id },
-      set = {
-        file = mark.file,
-        row = mark.row,
-        title = mark.title,
-        code = mark.code,
-      },
-    }
-  end
-  M.marks[mark.id] = mark
-  return mark.id
+    },
+  }
 end
 
 ---@param id number
 function M.remove_mark(id)
   marks_tbl:remove { where = { id = id } }
+  M.file_marks[M.marks[id].file][id] = nil
   M.marks[id] = nil
 end
 

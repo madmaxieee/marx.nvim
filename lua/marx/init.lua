@@ -9,13 +9,25 @@ function M.setup()
   database.setup { root_path = vim.fn.getcwd() }
 
   for _, mark in pairs(database.marks) do
-    marx.set_mark {
+    marx.set_extmark {
       id = mark.id,
       text = mark.title,
       bufnr = vim.uri_to_bufnr(vim.uri_from_fname(mark.file)),
       row = mark.row,
     }
   end
+
+  for file, _ in pairs(database.file_marks) do
+    marx.calibrate_buf(vim.uri_to_bufnr(vim.uri_from_fname(file)))
+  end
+
+  vim.api.nvim_create_autocmd({ "BufEnter", "BufWritePost", "InsertLeave" }, {
+    group = vim.api.nvim_create_augroup("MarxCalibrateMarks", { clear = true }),
+    callback = function()
+      local bufnr = vim.api.nvim_get_current_buf()
+      marx.calibrate_buf(bufnr)
+    end,
+  })
 end
 
 function M.set_bookmark()
@@ -35,27 +47,27 @@ function M.set_bookmark()
       end
     elseif text ~= nil then
       if old_mark then
-        database.upsert_mark {
+        database.update_mark {
           id = old_mark[1],
           file = vim.api.nvim_buf_get_name(bufnr),
           row = row,
           title = text,
           code = code,
         }
-        marx.set_mark {
+        marx.set_extmark {
           id = old_mark[1],
           bufnr = bufnr,
           row = row,
           text = text,
         }
       else
-        local id = database.upsert_mark {
+        local id = database.insert_mark {
           file = vim.api.nvim_buf_get_name(bufnr),
           row = row,
           title = text,
           code = code,
         }
-        marx.set_mark {
+        marx.set_extmark {
           id = id,
           bufnr = bufnr,
           row = row,
@@ -108,10 +120,10 @@ function M.prev_mark(opts)
   local current_row = vim.api.nvim_win_get_cursor(0)[1] - 1
   local bufnr = vim.api.nvim_get_current_buf()
 
-  local marks = vim.api.nvim_buf_get_extmarks(bufnr, marx.ns_id, { current_row - 1, 0 }, { 0, 0 }, { limit = 1 })
+  local extmarks = vim.api.nvim_buf_get_extmarks(bufnr, marx.ns_id, { current_row - 1, 0 }, { 0, 0 }, { limit = 1 })
 
-  if #marks == 1 then
-    local prev_mark_row = marks[#marks][2]
+  if #extmarks == 1 then
+    local prev_mark_row = extmarks[#extmarks][2]
     vim.api.nvim_win_set_cursor(0, { prev_mark_row + 1, 0 })
     return
   end
@@ -121,10 +133,10 @@ function M.prev_mark(opts)
   end
 
   local num_lines = vim.api.nvim_buf_line_count(bufnr)
-  marks = vim.api.nvim_buf_get_extmarks(bufnr, marx.ns_id, { num_lines, 0 }, { current_row + 1, 0 }, { limit = 1 })
+  extmarks = vim.api.nvim_buf_get_extmarks(bufnr, marx.ns_id, { num_lines, 0 }, { current_row + 1, 0 }, { limit = 1 })
 
-  if #marks == 1 then
-    local prev_mark_row = marks[#marks][2]
+  if #extmarks == 1 then
+    local prev_mark_row = extmarks[#extmarks][2]
     vim.api.nvim_win_set_cursor(0, { prev_mark_row + 1, 0 })
   end
 end

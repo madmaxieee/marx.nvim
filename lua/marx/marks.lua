@@ -1,6 +1,7 @@
 local M = {}
 
 local highlight = require "marx.highlight"
+local database = require "marx.database"
 
 M.group = "MarxGroup"
 M.ns_id = vim.api.nvim_create_namespace(M.group)
@@ -53,13 +54,12 @@ end
 
 ---@class marx.SetMarkOpts
 ---@field id number
----@field priority number?
 ---@field text string|table
 ---@field bufnr number
 ---@field row number
 
 ---@param opts marx.SetMarkOpts
-function M.set_mark(opts)
+local function _set_extmark(opts)
   local text = opts.text
   if type(text) == "string" then
     text = { { text, highlight.virt_text_hl } }
@@ -75,8 +75,9 @@ function M.set_mark(opts)
       end_col = line_length,
       virt_text = text,
       virt_text_pos = "eol",
-      priority = opts.priority or 10,
+      priority = 10,
       sign_text = "",
+
       sign_hl_group = highlight.sign_hl,
     })
   end
@@ -89,6 +90,60 @@ function M.set_mark(opts)
       once = true,
       callback = set_mark,
     })
+  end
+end
+
+---@param opts marx.SetMarkOpts
+function M.set_extmark(opts)
+  pcall(_set_extmark, opts)
+end
+
+---@param id number
+---@param buf_content? string[]
+function M.calibrate_mark(id, buf_content)
+  local mark = database.marks[id]
+  local bufnr = vim.uri_to_bufnr(vim.uri_from_fname(mark.file))
+  buf_content = buf_content or vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+
+  local extmark_pos = vim.api.nvim_buf_get_extmark_by_id(bufnr, M.ns_id, id, {})
+  if #extmark_pos ~= 0 then
+    local new_row = extmark_pos[1]
+    mark.row = new_row
+    mark.code = buf_content[new_row + 1]
+    database.update_mark(mark)
+    return
+  end
+
+  if buf_content[mark.row + 1] == mark.code then
+    return
+  end
+
+  for i = 1, #buf_content do
+    if mark.row + 1 + i <= #buf_content and buf_content[mark.row + 1 + i] == mark.code then
+      mark.row = mark.row + i
+      break
+    end
+    if mark.row + 1 - i >= 1 and buf_content[mark.row + 1 - i] == mark.code then
+      mark.row = mark.row - i
+      break
+    end
+  end
+
+  M.set_extmark {
+    id = id,
+    text = mark.title,
+    bufnr = bufnr,
+    row = mark.row,
+  }
+  database.update_mark(mark)
+end
+
+---@param bufnr number
+function M.calibrate_buf(bufnr)
+  local filename = vim.uri_to_fname(vim.uri_from_bufnr(bufnr))
+  local buf_content = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+  for mark_id, _ in pairs(database.file_marks[filename] or {}) do
+    M.calibrate_mark(mark_id, buf_content)
   end
 end
 
