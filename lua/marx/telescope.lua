@@ -13,50 +13,22 @@ local finders = require "telescope.finders"
 local actions = require "telescope.actions"
 local conf = require("telescope.config").values
 local action_state = require "telescope.actions.state"
+local entry_display = require "telescope.pickers.entry_display"
+local transform_devicons = require("telescope.utils").transform_devicons
 
 local marx_actions = require "marx.actions"
 
----@class FormatEntryConstraints
----@field max_title number?
----@field max_filename number?
----@field max_filepath number?
-
 ---@param mark marx.MarkData
----@param constraints FormatEntryConstraints
-local function format_entry(mark, constraints)
-  local max_title = math.max(constraints.max_title or 15, 15)
-  local max_filename = math.max(constraints.max_filename or 20, 20)
-  local max_filepath = math.max(constraints.max_filepath or 30, 30)
-  max_title = math.min(max_title, 30)
-  max_filename = math.min(max_filename, 30)
-  max_filepath = math.min(max_filepath, 40)
-
-  local name = mark.title
+local function make_ordinal(mark)
+  local title = mark.title
   local filename = vim.fn.fnamemodify(mark.file, ":t")
-  local path = vim.fn.pathshorten(mark.file)
+  local path = mark.file
 
-  -- Pad or truncate name
-  if #name > max_title then
-    name = name:sub(1, max_title - 2) .. ".."
-  else
-    name = name .. string.rep(" ", max_title - #name)
+  if #title < 50 then
+    title = title .. string.rep(" ", 50 - #title)
   end
 
-  -- Pad or truncate filename
-  if #filename > max_filename then
-    filename = filename:sub(1, max_filename - 2) .. ".."
-  else
-    filename = filename .. string.rep(" ", max_filename - #filename)
-  end
-
-  -- Pad or truncate path
-  if #path > max_filepath then
-    path = path:sub(1, max_filepath - 2) .. ".."
-  else
-    path = path .. string.rep(" ", max_filepath - #path)
-  end
-
-  return string.format("%s │ %s │ %s", name, filename, path)
+  return string.format("%s │ %s %s", title, filename, path)
 end
 
 ---@param callback fun(mark: marx.MarkData)
@@ -69,6 +41,39 @@ function M.pick_mark(callback, opts)
       table.insert(marks_list, value)
     end
     opts.marks = marks_list
+  end
+
+  local displayer = entry_display.create {
+    separator = " ",
+    items = {
+      { width = 40 },
+      { width = 1 },
+      { remaining = true },
+      { remaining = true },
+    },
+  }
+
+  ---@param entry {value:marx.MarkData}
+  local make_display = function(entry)
+    local path = entry.value.file
+    local filename = vim.fn.fnamemodify(entry.value.file, ":t")
+    local _, hl_group, icon = transform_devicons(filename, "", false)
+
+    local cwd = vim.fn.getcwd()
+    if path:sub(1, #cwd) == cwd then
+      path = "." .. path:sub(#cwd + 1)
+    end
+    local home_dir = vim.fn.expand "~"
+    if path:sub(1, #home_dir) == home_dir then
+      path = "~" .. path:sub(#home_dir + 1)
+    end
+
+    return displayer {
+      { entry.value.title, "TelescopeResultsIdentifier" },
+      { icon, hl_group },
+      vim.fn.fnamemodify(entry.value.file, ":t"),
+      { path, "TelescopeResultsField" },
+    }
   end
 
   ---@param marks marx.MarkData[]
@@ -86,36 +91,20 @@ function M.pick_mark(callback, opts)
       return true
     end)
 
-    ---@type FormatEntryConstraints
-    local constraints = {
-      max_title = 0,
-      max_filename = 0,
-      max_filepath = 0,
-    }
-
-    for _, m in ipairs(marks) do
-      constraints.max_title = math.max(constraints.max_title, #m.title)
-      local filename = vim.fn.fnamemodify(m.file, ":t")
-      local path = vim.fn.pathshorten(m.file)
-      constraints.max_filename = math.max(constraints.max_filename, #filename)
-      constraints.max_filepath = math.max(constraints.max_filepath, #path)
-    end
-
     pickers
       .new({}, {
         prompt_title = "Our Bookmarx",
         finder = finders.new_table {
           results = marks,
-          ---@param bookmark marx.MarkData
-          entry_maker = function(bookmark)
-            local display = format_entry(bookmark, constraints)
+          ---@param mark marx.MarkData
+          entry_maker = function(mark)
             return {
-              value = bookmark,
-              display = display,
-              ordinal = display,
-              filename = bookmark.file,
+              value = mark,
+              display = make_display,
+              ordinal = make_ordinal(mark),
+              filename = mark.file,
               col = 0,
-              lnum = bookmark.row + 1,
+              lnum = mark.row + 1,
             }
           end,
         },
