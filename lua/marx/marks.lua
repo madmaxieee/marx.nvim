@@ -105,8 +105,11 @@ function M.calibrate_mark(id, buf_content)
   if #extmark_pos ~= 0 then
     local new_row = extmark_pos[1]
     if new_row >= 0 and new_row < #buf_content then
-      mark.row = new_row
-      mark.content = buf_content[new_row + 1]
+      if mark.content == buf_content[new_row + 1] then
+        mark.row = new_row
+      elseif mark.row == new_row then
+        mark.content = buf_content[new_row + 1]
+      end
       database.update_mark(mark)
       return
     end
