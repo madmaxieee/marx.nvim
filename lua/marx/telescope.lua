@@ -26,7 +26,7 @@ local function make_ordinal(mark)
   if #title < 50 then
     title = title .. string.rep(" ", 50 - #title)
   end
-  return string.format("%s │ %s %s", title, filename, path)
+  return table.concat({ title, filename, path }, " ")
 end
 
 ---@param callback fun(mark: marx.MarkData)
@@ -34,11 +34,7 @@ end
 function M.pick_mark(callback, opts)
   opts = opts or {}
   if not opts.marks then
-    local marks_list = {}
-    for _, value in pairs(database.marks) do
-      table.insert(marks_list, value)
-    end
-    opts.marks = marks_list
+    opts.marks = vim.tbl_values(database.marks)
   end
 
   local displayer = entry_display.create {
@@ -137,6 +133,13 @@ function M.pick_mark(callback, opts)
   end
 
   open_picker(opts.marks)
+end
+
+function M.pick()
+  local marx_action = require "marx.actions"
+  return M.pick_mark(function(mark)
+    marx_action.jump(mark.id)
+  end)
 end
 
 return M

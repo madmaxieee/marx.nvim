@@ -4,7 +4,28 @@ local marx = require "marx.marks"
 local highlight = require "marx.highlight"
 local database = require "marx.database"
 
-function M.setup()
+---@class marx.Config
+---@field picker "snacks" | "telescope"
+
+---@type marx.Config
+M.config = {
+  picker = "snacks",
+}
+
+---@param opts? marx.Config
+function M.setup(opts)
+  opts = opts or {}
+
+  vim.validate("picker", opts.picker, function(v)
+    if v == nil or v == "snacks" or v == "telescope" then
+      return true
+    else
+      return false, "must be 'snacks' or 'telescope'"
+    end
+  end)
+
+  M.config = vim.tbl_deep_extend("force", M.config, opts or {})
+
   highlight.setup()
   database.setup { root_path = vim.fn.getcwd() }
 
@@ -28,6 +49,15 @@ function M.setup()
       marx.calibrate_buf(bufnr)
     end,
   })
+
+  if Snacks and pcall(require, "snacks.picker") then
+    Snacks.picker.sources.marx = require("marx.snacks").source
+  else
+    if M.config.picker == "snacks" then
+      vim.notify("Snacks.picker not found, falling back to telescope", vim.log.levels.WARN)
+      M.config.picker = "telescope"
+    end
+  end
 end
 
 function M.set_bookmark()
@@ -142,11 +172,18 @@ function M.prev_mark(opts)
 end
 
 function M.pick_mark()
-  local marx_telescope = require "marx.telescope"
-  local actions = require "marx.actions"
-  return marx_telescope.pick_mark(function(mark)
-    actions.jump(mark.id)
-  end)
+  if M.config.picker == "snacks" then
+    if Snacks and pcall(require, "snacks.picker") then
+      Snacks.picker.pick(require("marx.snacks").source)
+    else
+      vim.notify("Snacks.picker not found", vim.log.levels.ERROR)
+    end
+  elseif M.config.picker == "telescope" then
+    local marx_telescope = require "marx.telescope"
+    marx_telescope.pick()
+  else
+    vim.notify("Invalid picker: " .. tostring(M.config.picker), vim.log.levels.ERROR)
+  end
 end
 
 return M
