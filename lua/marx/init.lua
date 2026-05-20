@@ -171,6 +171,25 @@ function M.prev_mark(opts)
   end
 end
 
+---@param opts? marx.GetMarksOpts
+---@return marx.MarkData[]
+function M.get_marks(opts)
+  opts = opts or {}
+  local bufnr = opts.bufnr or vim.api.nvim_get_current_buf()
+  local filepath = vim.api.nvim_buf_get_name(bufnr)
+
+  local file_marks = database.file_marks[filepath]
+  if not file_marks then
+    return {}
+  end
+
+  local result = vim.tbl_values(file_marks)
+  table.sort(result, function(a, b)
+    return a.row < b.row
+  end)
+  return result
+end
+
 function M.pick_mark()
   if M.config.picker == "snacks" then
     if Snacks and pcall(require, "snacks.picker") then

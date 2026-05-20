@@ -6,3 +6,6 @@
 ---@field row number
 ---@field title string
 ---@field content string
+
+---@class marx.GetMarksOpts
+---@field bufnr number? Buffer number (defaults to current buffer)
