@@ -50,6 +50,10 @@ function M.setup(opts)
     end,
   })
 
+  vim.api.nvim_create_user_command("MarxClear", function()
+    M.clear_marks()
+  end, { desc = "Clear all marks in current buffer" })
+
   if Snacks and pcall(require, "snacks.picker") then
     Snacks.picker.sources.marx = require("marx.snacks").source
   else
@@ -188,6 +192,20 @@ function M.get_marks(opts)
     return a.row < b.row
   end)
   return result
+end
+
+---@param opts? marx.GetMarksOpts
+function M.clear_marks(opts)
+  local marks = M.get_marks(opts)
+  if #marks == 0 then
+    return
+  end
+
+  local bufnr = opts and opts.bufnr or vim.api.nvim_get_current_buf()
+  for _, mark in ipairs(marks) do
+    marx.remove_mark { id = mark.id, bufnr = bufnr }
+    database.remove_mark(mark.id)
+  end
 end
 
 function M.pick_mark()
