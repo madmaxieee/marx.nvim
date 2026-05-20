@@ -42,11 +42,28 @@ function M.setup(opts)
     marx.calibrate_buf(vim.uri_to_bufnr(vim.uri_from_fname(file)))
   end
 
-  vim.api.nvim_create_autocmd({ "BufEnter", "BufWritePost", "InsertLeave" }, {
-    group = vim.api.nvim_create_augroup("MarxCalibrateMarks", { clear = true }),
+  local calibrate_group = vim.api.nvim_create_augroup("MarxCalibrateMarks", { clear = true })
+
+  vim.api.nvim_create_autocmd({
+    "BufEnter",
+    "BufWritePost",
+    "InsertLeave",
+  }, {
+    group = calibrate_group,
     callback = function()
       local bufnr = vim.api.nvim_get_current_buf()
       marx.calibrate_buf(bufnr)
+    end,
+  })
+
+  vim.api.nvim_create_autocmd({
+    "FileChangedShellPost",
+    "BufReadPost",
+  }, {
+    group = calibrate_group,
+    callback = function()
+      local bufnr = vim.api.nvim_get_current_buf()
+      marx.calibrate_buf(bufnr, { force_content_search = true })
     end,
   })
 

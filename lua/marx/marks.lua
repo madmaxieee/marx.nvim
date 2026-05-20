@@ -94,35 +94,43 @@ function M.set_extmark(opts)
   end
 end
 
+---@class marx.CalibrateMarkOpts
+---@field buf_content? string[]
+---@field force_content_search? boolean -- skip extmark tracking and exact-row check
+
 ---@param id number
----@param buf_content? string[]
-function M.calibrate_mark(id, buf_content)
+---@param opts? marx.CalibrateMarkOpts
+function M.calibrate_mark(id, opts)
+  opts = opts or {}
+  local buf_content = opts.buf_content
   local mark = database.marks[id]
   local bufnr = vim.uri_to_bufnr(vim.uri_from_fname(mark.path))
   buf_content = buf_content or vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
 
-  local extmark_pos = vim.api.nvim_buf_get_extmark_by_id(bufnr, M.ns_id, id, {})
-  if #extmark_pos ~= 0 then
-    local new_row = extmark_pos[1]
-    if new_row >= 0 and new_row < #buf_content then
-      if mark.content == buf_content[new_row + 1] then
-        mark.row = new_row
-      elseif mark.row == new_row then
-        mark.content = buf_content[new_row + 1]
+  if not opts.force_content_search then
+    local extmark_pos = vim.api.nvim_buf_get_extmark_by_id(bufnr, M.ns_id, id, {})
+    if #extmark_pos ~= 0 then
+      local new_row = extmark_pos[1]
+      if new_row >= 0 and new_row < #buf_content then
+        if mark.content == buf_content[new_row + 1] then
+          mark.row = new_row
+        elseif mark.row == new_row then
+          mark.content = buf_content[new_row + 1]
+        end
+        database.update_mark(mark)
+        return
       end
-      database.update_mark(mark)
+    end
+
+    if buf_content[mark.row + 1] == mark.content then
+      M.set_extmark {
+        id = id,
+        text = mark.title,
+        bufnr = bufnr,
+        row = mark.row,
+      }
       return
     end
-  end
-
-  if buf_content[mark.row + 1] == mark.content then
-    M.set_extmark {
-      id = id,
-      text = mark.title,
-      bufnr = bufnr,
-      row = mark.row,
-    }
-    return
   end
 
   for i = 1, #buf_content do
@@ -151,11 +159,13 @@ function M.calibrate_mark(id, buf_content)
 end
 
 ---@param bufnr number
-function M.calibrate_buf(bufnr)
+---@param opts? marx.CalibrateMarkOpts
+function M.calibrate_buf(bufnr, opts)
+  opts = opts or {}
   local filename = vim.uri_to_fname(vim.uri_from_bufnr(bufnr))
-  local buf_content = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+  opts.buf_content = opts.buf_content or vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
   for mark_id, _ in pairs(database.file_marks[filename] or {}) do
-    M.calibrate_mark(mark_id, buf_content)
+    M.calibrate_mark(mark_id, opts)
   end
 end
 
