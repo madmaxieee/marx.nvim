@@ -121,16 +121,16 @@ function M.calibrate_mark(id, opts)
         return
       end
     end
+  end
 
-    if buf_content[mark.row + 1] == mark.content then
-      M.set_extmark {
-        id = id,
-        text = mark.title,
-        bufnr = bufnr,
-        row = mark.row,
-      }
-      return
-    end
+  if buf_content[mark.row + 1] == mark.content then
+    M.set_extmark {
+      id = id,
+      text = mark.title,
+      bufnr = bufnr,
+      row = mark.row,
+    }
+    return
   end
 
   for i = 1, #buf_content do
@@ -139,13 +139,12 @@ function M.calibrate_mark(id, opts)
         mark.row = mark.row + i
         break
       end
-    elseif mark.row + 1 - i >= 1 then
+    end
+    if mark.row + 1 - i >= 1 then
       if buf_content[mark.row + 1 - i] == mark.content then
         mark.row = mark.row - i
         break
       end
-    else
-      break
     end
   end
 
